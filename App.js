@@ -1,11 +1,21 @@
-import React, { useEffect, useState } from "react";
-import { StatusBar } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import { StatusBar, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/lib/AuthContext";
 import { COLORS } from "./src/theme/colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import * as SplashScreen from "expo-splash-screen"; // Optional but good practice
+
+// 1. IMPORT FONTS
+import {
+  useFonts,
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_700Bold,
+} from "@expo-google-fonts/playfair-display";
+import { Lato_400Regular, Lato_700Bold } from "@expo-google-fonts/lato";
 
 // Screens
 import AuthScreen from "./src/screens/AuthScreen";
@@ -39,7 +49,11 @@ function NavigationWrapper() {
 
   return (
     <NavigationContainer>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
@@ -47,12 +61,9 @@ function NavigationWrapper() {
         }}
         initialRouteName={isFirstLaunch ? "Onboarding" : "MainTabs"}
       >
-        {/* --- 1. SHARED SCREENS (Everyone can see these) --- */}
         <Stack.Screen name="MainTabs" component={HomeScreen} />
         <Stack.Screen name="Detail" component={DetailScreen} />
-
         {user ? (
-          // --- 2. LOGGED IN ONLY (Auth Screen is removed!) ---
           <>
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen
@@ -61,7 +72,6 @@ function NavigationWrapper() {
             />
           </>
         ) : (
-          // --- 3. GUEST ONLY (Hidden when logged in) ---
           <>
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -73,11 +83,26 @@ function NavigationWrapper() {
 }
 
 export default function App() {
+  // 2. LOAD FONTS HOOK
+  let [fontsLoaded] = useFonts({
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_700Bold,
+    Lato_400Regular,
+    Lato_700Bold,
+  });
+
+  // 3. WAIT FOR FONTS
+  if (!fontsLoaded) {
+    return <View />; // Or a custom Splash Screen component
+  }
+
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <NavigationWrapper />
-      </QueryClientProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <NavigationWrapper />
+        </QueryClientProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

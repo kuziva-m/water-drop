@@ -1,35 +1,37 @@
 import React, { useState, useEffect } from "react";
+import { FONTS } from "../theme/typography";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   TextInput,
   Alert,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 import { COLORS } from "../theme/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function ProfileScreen({ navigation }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-
-  // Profile Data State
   const [profile, setProfile] = useState({
     full_name: "",
     phone_number: "",
-    address: "", // Added Address for delivery
+    address: "",
     role: "buyer",
   });
 
-  // 1. Fetch Profile on Load
   useEffect(() => {
     fetchProfile();
   }, [user]);
@@ -38,332 +40,370 @@ export default function ProfileScreen({ navigation }) {
     try {
       setLoading(true);
       if (!user) return;
-
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-      } else if (data) {
-        setProfile(data);
-      }
+        .maybeSingle();
+      if (data) setProfile(data);
     } finally {
       setLoading(false);
     }
   }
 
-  // 2. Update Profile function
   async function updateProfile() {
     setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: profile.full_name,
-        phone_number: profile.phone_number,
-        address: profile.address,
-      })
-      .eq("id", user.id);
-
+    const { error } = await supabase.from("profiles").upsert({
+      id: user.id,
+      ...profile,
+      updated_at: new Date(),
+    });
     setSaving(false);
-
-    if (error) {
-      Alert.alert("Update Failed", error.message);
-    } else {
-      Alert.alert("Success", "Profile updated successfully!");
-      setIsEditing(false); // Exit Edit Mode
+    if (error) Alert.alert("Error", error.message);
+    else {
+      Alert.alert("Success", "Profile Updated");
+      setIsEditing(false);
     }
   }
 
-  // Helper to handle Logout
   async function handleLogout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) Alert.alert("Error", error.message);
+    await supabase.auth.signOut();
   }
 
-  if (loading) {
+  if (loading)
     return (
-      <View
-        style={[
-          styles.container,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <ActivityIndicator size="large" color={COLORS.accent} />
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.gold} />
       </View>
     );
-  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* --- HEADER --- */}
-      <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>My Profile</Text>
-        <TouchableOpacity
-          onPress={() => setIsEditing(!isEditing)}
-          style={styles.editBtn}
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* --- HEADER --- */}
+        <LinearGradient
+          colors={[COLORS.accent, COLORS.accentDark]}
+          style={[styles.header, { paddingTop: insets.top + 30 }]}
         >
-          <MaterialCommunityIcons
-            name={isEditing ? "close" : "pencil"}
-            size={20}
-            color={COLORS.accent}
-          />
-          <Text style={styles.editBtnText}>
-            {isEditing ? "Cancel" : "Edit"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* --- AVATAR SECTION --- */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {profile.full_name
-                ? profile.full_name.charAt(0).toUpperCase()
-                : user?.email?.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.emailText}>{user?.email}</Text>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {profile.role === "seller" ? "Supplier Account" : "Buyer Account"}
-            </Text>
-          </View>
-        </View>
-
-        {/* --- FORM SECTION --- */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionLabel}>PERSONAL DETAILS</Text>
-
-          {/* Full Name */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.full_name}
-                onChangeText={(text) =>
-                  setProfile({ ...profile, full_name: text })
-                }
-              />
-            ) : (
-              <Text style={styles.valueText}>
-                {profile.full_name || "Not set"}
-              </Text>
-            )}
-          </View>
-
-          {/* Phone Number */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone Number</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.phone_number}
-                keyboardType="phone-pad"
-                onChangeText={(text) =>
-                  setProfile({ ...profile, phone_number: text })
-                }
-              />
-            ) : (
-              <Text style={styles.valueText}>
-                {profile.phone_number || "Not set"}
-              </Text>
-            )}
-          </View>
-
-          {/* Address */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Default Delivery Address</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={profile.address}
-                placeholder="e.g. 42 Borrowdale Road"
-                onChangeText={(text) =>
-                  setProfile({ ...profile, address: text })
-                }
-              />
-            ) : (
-              <Text style={styles.valueText}>
-                {profile.address || "No address saved"}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* --- EDIT MODE ACTIONS --- */}
-        {isEditing && (
-          <TouchableOpacity
-            style={styles.saveBtn}
-            onPress={updateProfile}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.saveBtnText}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {/* --- SUPPLIER ACTIONS (Only visible if role is 'seller') --- */}
-        {!isEditing && profile.role === "seller" && (
-          <View style={styles.menuSection}>
-            <Text style={styles.sectionLabel}>BUSINESS TOOLS</Text>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.pageTitle}>My Profile</Text>
             <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => navigation.navigate("CreateListing")}
+              onPress={() => setIsEditing(!isEditing)}
+              style={styles.editBtn}
             >
-              <View style={[styles.iconBox, { backgroundColor: "#E3F2FD" }]}>
-                <MaterialCommunityIcons
-                  name="truck-plus"
-                  size={22}
-                  color={COLORS.accent}
-                />
-              </View>
-              <Text style={styles.menuText}>Create New Listing</Text>
+              <Text style={styles.editBtnText}>
+                {isEditing ? "Done" : "Edit"}
+              </Text>
               <MaterialCommunityIcons
-                name="chevron-right"
-                size={24}
-                color="#ccc"
+                name={isEditing ? "check" : "pencil"}
+                size={16}
+                color={COLORS.gold}
               />
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* --- LOGOUT --- */}
-        {!isEditing && (
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <MaterialCommunityIcons
-              name="logout"
-              size={20}
-              color={COLORS.error}
-            />
-            <Text style={styles.logoutText}>Log Out</Text>
-          </TouchableOpacity>
-        )}
+          {/* Profile Card */}
+          <View style={styles.profileCard}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {profile.full_name
+                  ? profile.full_name.charAt(0).toUpperCase()
+                  : "U"}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nameText}>
+                {profile.full_name || "Name Not Set"}
+              </Text>
+              <Text style={styles.emailText}>{user?.email}</Text>
+              <View style={styles.roleContainer}>
+                <MaterialCommunityIcons
+                  name="shield-check"
+                  size={14}
+                  color={COLORS.gold}
+                />
+                <Text style={styles.roleText}>
+                  {profile.role === "seller"
+                    ? "Verified Supplier"
+                    : "Verified Buyer"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* --- DETAILS SECTION --- */}
+        <View style={styles.content}>
+          <Text style={styles.sectionHeader}>ACCOUNT DETAILS</Text>
+
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <MaterialCommunityIcons
+                name="account-circle-outline"
+                size={28}
+                color={COLORS.accent}
+                style={styles.icon}
+              />
+              <View style={styles.field}>
+                <Text style={styles.label}>Full Name</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={profile.full_name}
+                    onChangeText={(t) =>
+                      setProfile({ ...profile, full_name: t })
+                    }
+                  />
+                ) : (
+                  <Text style={styles.value}>{profile.full_name || "—"}</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.row}>
+              <MaterialCommunityIcons
+                name="phone-outline"
+                size={28}
+                color={COLORS.accent}
+                style={styles.icon}
+              />
+              <View style={styles.field}>
+                <Text style={styles.label}>Phone Number</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={profile.phone_number}
+                    onChangeText={(t) =>
+                      setProfile({ ...profile, phone_number: t })
+                    }
+                    keyboardType="phone-pad"
+                  />
+                ) : (
+                  <Text style={styles.value}>
+                    {profile.phone_number || "—"}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.row}>
+              <MaterialCommunityIcons
+                name="map-marker-outline"
+                size={28}
+                color={COLORS.accent}
+                style={styles.icon}
+              />
+              <View style={styles.field}>
+                <Text style={styles.label}>Delivery Address</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={profile.address}
+                    onChangeText={(t) => setProfile({ ...profile, address: t })}
+                  />
+                ) : (
+                  <Text style={styles.value}>{profile.address || "—"}</Text>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* --- ACTIONS --- */}
+          {isEditing && (
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={updateProfile}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {!isEditing && profile.role === "seller" && (
+            <TouchableOpacity
+              style={styles.goldBtn}
+              onPress={() => navigation.navigate("CreateListing")}
+            >
+              <LinearGradient
+                colors={[COLORS.gold, "#B8860B"]}
+                style={styles.btnGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <MaterialCommunityIcons name="plus" size={24} color="white" />
+                <Text style={styles.goldBtnText}>Create New Listing</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {!isEditing && (
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Sign Out</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { padding: 20 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   // Header
-  headerRow: {
+  header: {
+    paddingHorizontal: 25,
+    paddingBottom: 50,
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
+  },
+  headerTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    marginBottom: 20,
+    marginBottom: 30,
   },
-  headerTitle: { fontSize: 24, fontWeight: "bold", color: COLORS.textMain },
-  editBtn: { flexDirection: "row", alignItems: "center", padding: 8 },
-  editBtnText: { color: COLORS.accent, fontWeight: "600", marginLeft: 5 },
+  pageTitle: { fontSize: 34, color: "white", fontFamily: FONTS.serif }, // Playfair Display
+  nameText: {
+    fontSize: 22,
+    color: "white",
+    marginBottom: 4,
+    fontFamily: FONTS.bold,
+  }, // Lato Bold
+  sectionHeader: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginBottom: 15,
+    letterSpacing: 1,
+    fontFamily: FONTS.bold,
+  },
+  value: { fontSize: 18, color: COLORS.textMain, fontFamily: FONTS.regular },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  editBtnText: { color: COLORS.gold, fontWeight: "bold", marginRight: 5 },
 
   // Profile Card
-  profileHeader: { alignItems: "center", marginBottom: 30 },
+  profileCard: { flexDirection: "row", alignItems: "center" },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.accent,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: COLORS.gold,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
-    elevation: 5,
+    marginRight: 20,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  avatarText: { fontSize: 32, fontWeight: "bold", color: "white" },
-  emailText: { fontSize: 16, color: COLORS.textSub, marginBottom: 5 },
-  roleBadge: {
-    backgroundColor: "#E8F5E9",
+  avatarText: { fontSize: 32, fontWeight: "bold", color: COLORS.accentDark },
+  nameText: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "white",
+    marginBottom: 4,
+  },
+  emailText: { fontSize: 14, color: "rgba(255,255,255,0.8)", marginBottom: 8 },
+  roleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   roleText: {
-    color: "#2E7D32",
+    color: COLORS.gold,
     fontSize: 12,
     fontWeight: "bold",
-    textTransform: "uppercase",
+    marginLeft: 6,
   },
 
-  // Forms
-  formSection: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-  },
-  sectionLabel: {
-    fontSize: 12,
+  // Content
+  content: { paddingHorizontal: 20, marginTop: 25 },
+  sectionHeader: {
+    fontSize: 14,
     fontWeight: "bold",
     color: COLORS.textMuted,
     marginBottom: 15,
     letterSpacing: 1,
   },
-  inputGroup: { marginBottom: 15 },
-  label: { fontSize: 13, color: COLORS.textSub, marginBottom: 5 },
-  valueText: { fontSize: 16, color: COLORS.textMain, fontWeight: "500" },
+
+  // Card
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 25,
+    marginBottom: 25,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  row: { flexDirection: "row", alignItems: "center", marginVertical: 8 },
+  icon: { marginRight: 20, opacity: 0.8 },
+  field: { flex: 1 },
+  label: {
+    fontSize: 13,
+    color: COLORS.textSub,
+    marginBottom: 4,
+    fontWeight: "600",
+  },
+  value: { fontSize: 18, color: COLORS.textMain, fontWeight: "500" },
   input: {
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 16,
+    fontSize: 18,
     color: COLORS.textMain,
-    borderWidth: 1,
-    borderColor: "#ddd",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.accent,
+    paddingVertical: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#eee",
+    marginVertical: 15,
+    marginLeft: 50,
   },
 
-  // Actions
+  // Buttons
   saveBtn: {
     backgroundColor: COLORS.accent,
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 16,
     alignItems: "center",
-    marginBottom: 20,
+    elevation: 5,
   },
   saveBtnText: { color: "white", fontWeight: "bold", fontSize: 16 },
-
-  // Menus
-  menuSection: { marginBottom: 20 },
-  menuItem: {
+  goldBtn: { borderRadius: 16, overflow: "hidden", elevation: 5 },
+  btnGradient: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface,
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 10,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
     justifyContent: "center",
+    padding: 18,
     alignItems: "center",
-    marginRight: 15,
   },
-  menuText: {
-    flex: 1,
+  goldBtnText: {
+    color: "white",
+    fontWeight: "bold",
     fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.textMain,
+    marginLeft: 10,
   },
-
-  logoutBtn: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 15,
-    borderRadius: 12,
-    backgroundColor: "#FFEBEE",
-  },
-  logoutText: { color: COLORS.error, fontWeight: "bold", marginLeft: 8 },
+  logoutBtn: { padding: 20, alignItems: "center", marginTop: 10 },
+  logoutText: { color: COLORS.textMuted, fontWeight: "bold" },
 });

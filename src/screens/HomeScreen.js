@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
+import { FONTS } from "../theme/typography";
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
+  ActivityIndicator,
+  Platform,
+  BackHandler,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -13,14 +16,39 @@ import { FlashList } from "@shopify/flash-list";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
 import { COLORS } from "../theme/colors";
-// 1. Import the Auth Context
 import { useAuth } from "../lib/AuthContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect } from "@react-navigation/native"; // <--- 1. IMPORT THIS
 
 export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
-
-  // 2. Get the current user status
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+
+  // --- 2. THE BACK BUTTON HANDLER ---
+  // --- 2. THE BACK BUTTON HANDLER (FIXED) ---
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (!user) {
+          navigation.navigate("Onboarding");
+          return true;
+        }
+        return false;
+      };
+
+      // NEW WAY: Store the subscription
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress
+      );
+
+      // NEW WAY: Call .remove() on the subscription
+      return () => subscription.remove();
+    }, [user, navigation])
+  );
+  // ----------------------------------
 
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ["suppliers"],
@@ -46,237 +74,271 @@ export default function HomeScreen({ navigation }) {
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigation.navigate("Detail", { supplier: item })}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
     >
-      <View style={styles.cardRow}>
+      <View style={styles.cardInner}>
+        {/* Left: Image */}
         <Image
           source={{ uri: item.image_url }}
           style={styles.cardImage}
           contentFit="cover"
         />
+
+        {/* Right: Content */}
         <View style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <View style={styles.ratingTag}>
+          <View>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <View style={styles.locationRow}>
               <MaterialCommunityIcons
-                name="star"
-                size={12}
-                color={COLORS.textMain}
-              />
-              <Text style={styles.ratingText}>{item.rating}</Text>
-            </View>
-          </View>
-          <Text style={styles.cardSub} numberOfLines={1}>
-            Servicing:{" "}
-            {item.locations ? item.locations.join(", ") : "All Areas"}
-          </Text>
-          <View style={styles.cardMeta}>
-            <View style={styles.metaBadge}>
-              <MaterialCommunityIcons
-                name="clock-outline"
+                name="map-marker"
                 size={14}
                 color={COLORS.textSub}
               />
-              <Text style={styles.metaText}>{item.eta}</Text>
+              <Text style={styles.cardSub} numberOfLines={1}>
+                {item.locations ? item.locations[0] : "Harare"}
+              </Text>
             </View>
-            <Text style={styles.priceText}>from ${item.base_price}</Text>
+          </View>
+
+          <View style={styles.cardFooter}>
+            <View style={styles.priceTag}>
+              <Text style={styles.priceLabel}>Base Price</Text>
+              <Text style={styles.priceValue}>${item.base_price}</Text>
+            </View>
+
+            {/* Gold Action Button */}
+            <View style={styles.bookBtn}>
+              <MaterialCommunityIcons
+                name="arrow-right"
+                size={20}
+                color={COLORS.gold}
+              />
+            </View>
           </View>
         </View>
+      </View>
+
+      {/* Floating Rating Badge */}
+      <View style={styles.ratingBadge}>
+        <MaterialCommunityIcons name="star" size={12} color="white" />
+        <Text style={styles.ratingText}>{item.rating}</Text>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user ? "User" : "Guest"}</Text>
-          <Text style={styles.headline}>Find water near you.</Text>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      {/* --- HERO HEADER --- */}
+      <LinearGradient
+        colors={[COLORS.accent, COLORS.accentDark]}
+        style={[styles.header, { paddingTop: insets.top + 20 }]}
+      >
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.greeting}>Welcome Back,</Text>
+            <Text style={styles.username}>
+              {user ? user.email.split("@")[0] : "Guest"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.profileBtn}
+            onPress={() => navigation.navigate(user ? "Profile" : "Auth")}
+          >
+            <MaterialCommunityIcons
+              name="account"
+              size={24}
+              color={COLORS.accent}
+            />
+          </TouchableOpacity>
         </View>
 
-        {/* 3. Updated Profile Icon Logic */}
-        <TouchableOpacity
-          style={styles.profileIcon}
-          onPress={() => navigation.navigate(user ? "Profile" : "Auth")}
-        >
+        {/* Search Bar */}
+        <View style={styles.searchWrapper}>
           <MaterialCommunityIcons
-            name="account"
+            name="magnify"
             size={24}
-            // Icon turns Blue (Accent) if logged in, White (Surface) if guest
-            color={user ? COLORS.accent : COLORS.surface}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <MaterialCommunityIcons
-            name="map-marker"
-            size={20}
-            color={COLORS.accent}
+            color={COLORS.textMuted}
           />
           <TextInput
-            style={styles.input}
-            placeholder="Enter your suburb (e.g. Greendale)"
+            style={styles.searchInput}
+            placeholder="Find water in your area..."
             placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <MaterialCommunityIcons
-                name="close-circle"
-                size={18}
-                color={COLORS.textMuted}
-              />
-            </TouchableOpacity>
-          )}
         </View>
-      </View>
+      </LinearGradient>
 
+      {/* --- LIST SECTION --- */}
       <View style={styles.listContainer}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Available Suppliers</Text>
+          <Text style={styles.sectionTitle}>Premium Suppliers</Text>
           <Text style={styles.resultCount}>
-            {isLoading ? "Loading..." : `${filteredSuppliers.length} found`}
+            {isLoading ? "..." : filteredSuppliers.length} found
           </Text>
         </View>
 
-        <FlashList
-          data={filteredSuppliers}
-          renderItem={renderSupplier}
-          estimatedItemSize={100}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons
-                name="water-off"
-                size={48}
-                color={COLORS.textMuted}
-              />
-              <Text style={styles.emptyText}>
-                {isLoading ? "Connecting..." : "No suppliers found."}
-              </Text>
-            </View>
-          }
-        />
+        {isLoading ? (
+          <ActivityIndicator
+            size="large"
+            color={COLORS.accent}
+            style={{ marginTop: 50 }}
+          />
+        ) : (
+          <FlashList
+            data={filteredSuppliers}
+            renderItem={renderSupplier}
+            estimatedItemSize={120}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+
+  // Header
   header: {
     paddingHorizontal: 25,
-    paddingTop: 20,
-    paddingBottom: 15,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+  },
+  headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 25,
   },
-  greeting: { fontSize: 14, color: COLORS.textMuted, fontWeight: "600" },
-  headline: {
-    fontSize: 28,
-    color: COLORS.textMain,
-    fontWeight: "bold",
-    letterSpacing: -0.5,
-  },
-  profileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.textMain,
+  greeting: {
+    fontSize: 16,
+    color: COLORS.gold,
+    marginBottom: 2,
+    fontFamily: FONTS.regular,
+  }, // <--- UPDATED
+  username: { fontSize: 32, color: "white", fontFamily: FONTS.serif }, // <--- UPDATED (Playfair)
+
+  profileBtn: {
+    width: 45,
+    height: 45,
+    borderRadius: 25,
+    backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
+    elevation: 5,
   },
-  searchContainer: { paddingHorizontal: 25, marginBottom: 20 },
-  searchBar: {
+
+  // Search
+  searchWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 15,
-    height: 50,
+    backgroundColor: "white",
     borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#fff",
+    paddingHorizontal: 15,
+    height: 55,
+    elevation: 8,
   },
-  input: {
+  searchInput: {
     flex: 1,
     marginLeft: 10,
     fontSize: 16,
     color: COLORS.textMain,
     height: "100%",
-  },
-  listContainer: { flex: 1, paddingHorizontal: 25 },
+    fontFamily: FONTS.regular,
+  }, // <--- UPDATED
+
+  // List
+  listContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 25 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
+    alignItems: "center",
     marginBottom: 15,
+    paddingHorizontal: 5,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textMain },
+  sectionTitle: {
+    fontSize: 22,
+    color: COLORS.textMain,
+    fontFamily: FONTS.serif,
+  }, // <--- UPDATED (Playfair)
   resultCount: {
-    fontSize: 12,
     color: COLORS.textMuted,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
+    fontSize: 12,
+    fontFamily: FONTS.regular,
+  }, // <--- UPDATED
+
+  // Cards
   card: {
+    marginBottom: 20,
+    borderRadius: 18,
     backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 15,
-    marginBottom: 15,
-    elevation: 2,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
-  cardRow: { flexDirection: "row" },
+  cardInner: { flexDirection: "row", padding: 12 },
   cardImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    backgroundColor: COLORS.background,
+    width: 100,
+    height: 100,
+    borderRadius: 14,
+    backgroundColor: "#eee",
   },
-  cardContent: { flex: 1, marginLeft: 15, justifyContent: "center" },
-  cardHeader: {
+
+  cardContent: { flex: 1, marginLeft: 15, justifyContent: "space-between" },
+  cardTitle: { fontSize: 18, color: COLORS.textMain, fontFamily: FONTS.bold }, // <--- UPDATED (Lato Bold)
+  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  cardSub: {
+    color: COLORS.textSub,
+    fontSize: 13,
+    marginLeft: 4,
+    fontFamily: FONTS.regular,
+  }, // <--- UPDATED
+
+  cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
+    marginTop: 10,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: COLORS.textMain },
-  ratingTag: {
+  priceLabel: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    textTransform: "uppercase",
+    fontFamily: FONTS.bold,
+  }, // <--- UPDATED
+  priceValue: { fontSize: 20, color: COLORS.accent, fontFamily: FONTS.bold }, // <--- UPDATED
+
+  bookBtn: {
+    width: 35,
+    height: 35,
+    borderRadius: 20,
+    backgroundColor: "#F0F4F8",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  ratingBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   ratingText: {
+    color: "white",
     fontSize: 11,
-    fontWeight: "700",
     marginLeft: 4,
-    color: COLORS.textMain,
-  },
-  cardSub: {
-    fontSize: 13,
-    color: COLORS.textSub,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  cardMeta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  metaBadge: { flexDirection: "row", alignItems: "center" },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.textSub,
-    marginLeft: 4,
-    fontWeight: "500",
-  },
-  priceText: { fontSize: 14, fontWeight: "700", color: COLORS.accent },
-  emptyState: { alignItems: "center", marginTop: 50 },
-  emptyText: { marginTop: 10, color: COLORS.textMuted, fontSize: 14 },
+    fontFamily: FONTS.bold,
+  }, // <--- UPDATED
 });
