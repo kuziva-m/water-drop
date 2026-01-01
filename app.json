@@ -2,6 +2,7 @@
   "expo": {
     "name": "water-drop",
     "slug": "water-drop",
+    "scheme": "waterdrop",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

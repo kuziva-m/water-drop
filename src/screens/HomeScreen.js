@@ -13,9 +13,14 @@ import { FlashList } from "@shopify/flash-list";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
 import { COLORS } from "../theme/colors";
+// 1. Import the Auth Context
+import { useAuth } from "../lib/AuthContext";
 
 export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 2. Get the current user status
+  const { user } = useAuth();
 
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ["suppliers"],
@@ -85,16 +90,22 @@ export default function HomeScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello, Guest</Text>
+          <Text style={styles.greeting}>Hello, {user ? "User" : "Guest"}</Text>
           <Text style={styles.headline}>Find water near you.</Text>
         </View>
-        <View style={styles.profileIcon}>
+
+        {/* 3. Updated Profile Icon Logic */}
+        <TouchableOpacity
+          style={styles.profileIcon}
+          onPress={() => navigation.navigate(user ? "Profile" : "Auth")}
+        >
           <MaterialCommunityIcons
             name="account"
             size={24}
-            color={COLORS.surface}
+            // Icon turns Blue (Accent) if logged in, White (Surface) if guest
+            color={user ? COLORS.accent : COLORS.surface}
           />
-        </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
