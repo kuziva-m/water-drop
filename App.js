@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { StatusBar, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -7,9 +7,9 @@ import { AuthProvider, useAuth } from "./src/lib/AuthContext";
 import { COLORS } from "./src/theme/colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import * as SplashScreen from "expo-splash-screen"; // Optional but good practice
+import * as SplashScreen from "expo-splash-screen";
 
-// 1. IMPORT FONTS
+// FONTS
 import {
   useFonts,
   PlayfairDisplay_400Regular,
@@ -17,13 +17,14 @@ import {
 } from "@expo-google-fonts/playfair-display";
 import { Lato_400Regular, Lato_700Bold } from "@expo-google-fonts/lato";
 
-// Screens
+// SCREENS
 import AuthScreen from "./src/screens/AuthScreen";
-import HomeScreen from "./src/screens/HomeScreen";
 import DetailScreen from "./src/screens/DetailScreen";
-import ProfileScreen from "./src/screens/ProfileScreen";
 import CreateListingScreen from "./src/screens/CreateListingScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
+
+// NAVIGATION
+import MainTabs from "./src/navigation/MainTabs"; // <--- NEW IMPORT
 
 const queryClient = new QueryClient();
 const Stack = createNativeStackNavigator();
@@ -61,21 +62,19 @@ function NavigationWrapper() {
         }}
         initialRouteName={isFirstLaunch ? "Onboarding" : "MainTabs"}
       >
-        <Stack.Screen name="MainTabs" component={HomeScreen} />
+        {/* --- 1. MAIN TABS (The New Root) --- */}
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+
+        {/* --- 2. SCREENS THAT COVER TABS --- */}
         <Stack.Screen name="Detail" component={DetailScreen} />
-        {user ? (
-          <>
-            <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen
-              name="CreateListing"
-              component={CreateListingScreen}
-            />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="Auth" component={AuthScreen} />
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-          </>
+
+        {/* --- 3. AUTH & FLOWS --- */}
+        {!user && <Stack.Screen name="Auth" component={AuthScreen} />}
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+
+        {/* Logged In Only */}
+        {user && (
+          <Stack.Screen name="CreateListing" component={CreateListingScreen} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
@@ -83,7 +82,6 @@ function NavigationWrapper() {
 }
 
 export default function App() {
-  // 2. LOAD FONTS HOOK
   let [fontsLoaded] = useFonts({
     PlayfairDisplay_400Regular,
     PlayfairDisplay_700Bold,
@@ -91,9 +89,8 @@ export default function App() {
     Lato_700Bold,
   });
 
-  // 3. WAIT FOR FONTS
   if (!fontsLoaded) {
-    return <View />; // Or a custom Splash Screen component
+    return <View />;
   }
 
   return (

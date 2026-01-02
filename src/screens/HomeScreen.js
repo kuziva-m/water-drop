@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from "react";
-import { FONTS } from "../theme/typography";
 import {
   StyleSheet,
   Text,
@@ -19,15 +18,15 @@ import { COLORS } from "../theme/colors";
 import { useAuth } from "../lib/AuthContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect } from "@react-navigation/native"; // <--- 1. IMPORT THIS
+import { useFocusEffect } from "@react-navigation/native";
+import { FONTS } from "../theme/typography"; // Import the new fonts
 
 export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
-  // --- 2. THE BACK BUTTON HANDLER ---
-  // --- 2. THE BACK BUTTON HANDLER (FIXED) ---
+  // --- BACK BUTTON HANDLER ---
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -38,17 +37,13 @@ export default function HomeScreen({ navigation }) {
         return false;
       };
 
-      // NEW WAY: Store the subscription
       const subscription = BackHandler.addEventListener(
         "hardwareBackPress",
         onBackPress
       );
-
-      // NEW WAY: Call .remove() on the subscription
       return () => subscription.remove();
     }, [user, navigation])
   );
-  // ----------------------------------
 
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ["suppliers"],
@@ -77,12 +72,23 @@ export default function HomeScreen({ navigation }) {
       activeOpacity={0.9}
     >
       <View style={styles.cardInner}>
-        {/* Left: Image */}
-        <Image
-          source={{ uri: item.image_url }}
-          style={styles.cardImage}
-          contentFit="cover"
-        />
+        {/* Left: Image or Placeholder Icon */}
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={styles.cardImage}
+            contentFit="cover"
+            transition={200}
+          />
+        ) : (
+          <View style={[styles.cardImage, styles.placeholderContainer]}>
+            <MaterialCommunityIcons
+              name="truck-delivery-outline"
+              size={32}
+              color={COLORS.accent}
+            />
+          </View>
+        )}
 
         {/* Right: Content */}
         <View style={styles.cardContent}>
@@ -148,7 +154,7 @@ export default function HomeScreen({ navigation }) {
           >
             <MaterialCommunityIcons
               name="account"
-              size={24}
+              size={26}
               color={COLORS.accent}
             />
           </TouchableOpacity>
@@ -217,16 +223,20 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   greeting: {
-    fontSize: 16,
+    fontSize: 18, // Increased from 16
     color: COLORS.gold,
-    marginBottom: 2,
+    marginBottom: 4,
     fontFamily: FONTS.regular,
-  }, // <--- UPDATED
-  username: { fontSize: 32, color: "white", fontFamily: FONTS.serif }, // <--- UPDATED (Playfair)
+  },
+  username: {
+    fontSize: 30,
+    color: "white",
+    fontFamily: FONTS.serif,
+  },
 
   profileBtn: {
-    width: 45,
-    height: 45,
+    width: 50,
+    height: 50,
     borderRadius: 25,
     backgroundColor: "white",
     justifyContent: "center",
@@ -251,7 +261,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     height: "100%",
     fontFamily: FONTS.regular,
-  }, // <--- UPDATED
+  },
 
   // List
   listContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 25 },
@@ -263,15 +273,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 20,
     color: COLORS.textMain,
     fontFamily: FONTS.serif,
-  }, // <--- UPDATED (Playfair)
+  },
   resultCount: {
     color: COLORS.textMuted,
-    fontSize: 12,
+    fontSize: 14, // Increased from 12
     fontFamily: FONTS.regular,
-  }, // <--- UPDATED
+  },
 
   // Cards
   card: {
@@ -284,22 +294,34 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   cardInner: { flexDirection: "row", padding: 12 },
+
+  // Image & Placeholder
   cardImage: {
     width: 100,
     height: 100,
     borderRadius: 14,
-    backgroundColor: "#eee",
+    backgroundColor: "#F0F4F8",
+  },
+  placeholderContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E8E6DF",
   },
 
   cardContent: { flex: 1, marginLeft: 15, justifyContent: "space-between" },
-  cardTitle: { fontSize: 18, color: COLORS.textMain, fontFamily: FONTS.bold }, // <--- UPDATED (Lato Bold)
-  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  cardTitle: {
+    fontSize: 18,
+    color: COLORS.textMain,
+    fontFamily: FONTS.bold,
+  },
+  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   cardSub: {
     color: COLORS.textSub,
-    fontSize: 13,
+    fontSize: 14, // Increased from 13
     marginLeft: 4,
     fontFamily: FONTS.regular,
-  }, // <--- UPDATED
+  },
 
   cardFooter: {
     flexDirection: "row",
@@ -308,16 +330,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   priceLabel: {
-    fontSize: 10,
+    fontSize: 12, // Increased from 10
     color: COLORS.textMuted,
     textTransform: "uppercase",
     fontFamily: FONTS.bold,
-  }, // <--- UPDATED
-  priceValue: { fontSize: 20, color: COLORS.accent, fontFamily: FONTS.bold }, // <--- UPDATED
+    marginBottom: 2,
+  },
+  priceValue: {
+    fontSize: 22,
+    color: COLORS.accent,
+    fontFamily: FONTS.bold,
+  },
 
   bookBtn: {
-    width: 35,
-    height: 35,
+    width: 40,
+    height: 40,
     borderRadius: 20,
     backgroundColor: "#F0F4F8",
     justifyContent: "center",
@@ -328,7 +355,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     left: 12,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.7)",
     borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
@@ -337,8 +364,8 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     color: "white",
-    fontSize: 11,
+    fontSize: 12,
     marginLeft: 4,
     fontFamily: FONTS.bold,
-  }, // <--- UPDATED
+  },
 });

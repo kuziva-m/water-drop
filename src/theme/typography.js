@@ -1,10 +1,19 @@
-// src/theme/typography.js
-export const FONTS = {
-  // Use for huge headers (The "Da Vinci" feel)
-  serif: "PlayfairDisplay_700Bold",
-  serifRegular: "PlayfairDisplay_400Regular",
+import { Platform } from "react-native";
 
-  // Use for all standard text
-  regular: "Lato_400Regular",
-  bold: "Lato_700Bold",
+// Use system defaults for a native, fast, and clean feel
+const sansSerif = Platform.select({
+  ios: "System",
+  android: "Roboto_400Regular",
+});
+const sansSerifBold = Platform.select({
+  ios: "System",
+  android: "Roboto_700Bold",
+});
+
+export const FONTS = {
+  // We map everything to sans-serif for a modern utility look
+  serif: sansSerifBold, // Used for headers
+  serifRegular: sansSerif,
+  regular: sansSerif, // Used for body text
+  bold: sansSerifBold, // Used for emphasis
 };
