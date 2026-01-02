@@ -18,21 +18,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { COLORS } from "../theme/colors";
 import { FONTS } from "../theme/typography";
 
-// Swiss Style Color Palette
-const SWISS = {
-  navy: "#0A1628",
-  navyLight: "#1a2942",
-  gold: "#D4AF37",
-  goldLight: "#E8C96F",
-  white: "#FFFFFF",
-  offWhite: "#F2F4F8", // Slightly darker for better contrast
-  grey: "#8B92A0",
-  greyLight: "#E4E7EB",
-};
-
 export default function ProfileScreen({ navigation }) {
+  // 1. CALL ALL HOOKS AT THE TOP (Regardless of user state)
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -49,8 +39,13 @@ export default function ProfileScreen({ navigation }) {
     avatar_url: null,
   });
 
+  // 2. USE EFFECTS (Always called, logic inside handles checks)
   useEffect(() => {
-    fetchProfile();
+    if (user) {
+      fetchProfile();
+    } else {
+      setLoading(false); // Stop loading if guest
+    }
   }, [user]);
 
   async function fetchProfile() {
@@ -72,9 +67,8 @@ export default function ProfileScreen({ navigation }) {
     try {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
+      if (status !== "granted")
         return Alert.alert("Permission Needed", "Please allow photo access.");
-      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -88,6 +82,7 @@ export default function ProfileScreen({ navigation }) {
   }
 
   async function uploadImage(imageAsset) {
+    if (!user) return;
     try {
       setUploading(true);
       const fileExt = imageAsset.uri.split(".").pop();
@@ -125,6 +120,7 @@ export default function ProfileScreen({ navigation }) {
   }
 
   async function updateProfile() {
+    if (!user) return;
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
@@ -141,13 +137,45 @@ export default function ProfileScreen({ navigation }) {
     await supabase.auth.signOut();
   }
 
-  if (loading)
+  // 3. CONDITIONAL RENDERING (This MUST be after all hooks)
+
+  // -- A. GUEST VIEW --
+  if (!user) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={SWISS.gold} />
+      <View style={styles.container}>
+        <LinearGradient
+          colors={[COLORS.primary, COLORS.primaryLight]}
+          style={[styles.guestHeader, { paddingTop: insets.top + 40 }]}
+        >
+          <MaterialCommunityIcons name="water" size={80} color="white" />
+          <Text style={styles.guestTitle}>Welcome to Water Drop</Text>
+          <Text style={styles.guestSub}>
+            The easiest way to order water in Zimbabwe.
+          </Text>
+        </LinearGradient>
+
+        <View style={styles.guestContent}>
+          <TouchableOpacity
+            style={styles.primaryAction}
+            onPress={() => navigation.navigate("Auth")}
+          >
+            <Text style={styles.primaryActionText}>SIGN IN / REGISTER</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
+  }
 
+  // -- B. LOADING VIEW --
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  // -- C. LOGGED IN VIEW --
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -157,199 +185,176 @@ export default function ProfileScreen({ navigation }) {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          bounces={false}
         >
-          {/* 1. HERO HEADER (Inside ScrollView to prevent clipping) */}
-          <LinearGradient
-            colors={[SWISS.navy, SWISS.navyLight]}
-            style={[styles.heroHeader, { paddingTop: insets.top + 20 }]}
-          >
-            {/* Edit Button */}
+          {/* HEADER */}
+          <View style={[styles.headerBg, { paddingTop: insets.top + 20 }]}>
+            <Text style={styles.headerTitle}>My Profile</Text>
             <TouchableOpacity
               onPress={() => setIsEditing(!isEditing)}
-              style={[styles.editButton, { top: insets.top + 20 }]}
+              style={styles.editBtn}
             >
-              <Text style={styles.editButtonText}>
-                {isEditing ? "DONE" : "EDIT"}
+              <Text style={styles.editBtnText}>
+                {isEditing ? "Done" : "Edit"}
               </Text>
-            </TouchableOpacity>
-
-            {/* Title */}
-            <View style={styles.titleContainer}>
-              <Text style={styles.heroTitle}>Profile</Text>
-              <View style={styles.titleUnderline} />
-            </View>
-          </LinearGradient>
-
-          {/* 2. AVATAR BRIDGE (The Overlap Magic) */}
-          <View style={styles.avatarBridge}>
-            <TouchableOpacity
-              onPress={pickImage}
-              disabled={uploading}
-              style={styles.avatarWrapper}
-              activeOpacity={0.8}
-            >
-              {uploading ? (
-                <View style={styles.avatarLoading}>
-                  <ActivityIndicator color={SWISS.gold} size="large" />
-                </View>
-              ) : profile.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  style={styles.avatarImage}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                />
-              ) : (
-                <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarInitial}>
-                    {profile.full_name
-                      ? profile.full_name.charAt(0).toUpperCase()
-                      : "U"}
-                  </Text>
-                </View>
-              )}
-              {/* Camera Icon */}
-              <View style={styles.cameraIcon}>
-                <MaterialCommunityIcons
-                  name="camera"
-                  size={16}
-                  color={SWISS.navy}
-                />
-              </View>
             </TouchableOpacity>
           </View>
 
-          {/* 3. CONTENT CARD */}
-          <View style={styles.contentCard}>
-            {/* Identity */}
-            <View style={styles.identitySection}>
-              <Text style={styles.displayName}>
-                {profile.full_name || "Guest User"}
-              </Text>
-              <Text style={styles.emailAddress}>{user?.email}</Text>
-              <View style={styles.roleBadge}>
-                <View style={styles.badgeDot} />
-                <Text style={styles.roleText}>
-                  {profile.role === "seller" ? "SUPPLIER" : "BUYER"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.spacer} />
-
-            {/* Form Fields */}
-            <View style={styles.infoGrid}>
-              <Text style={styles.gridHeader}>ACCOUNT DETAILS</Text>
-
-              {/* Full Name */}
-              <View style={styles.gridRow}>
-                <Text style={styles.gridLabel}>Full Name</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={styles.gridInput}
-                    value={profile.full_name}
-                    onChangeText={(t) =>
-                      setProfile({ ...profile, full_name: t })
-                    }
-                  />
-                ) : (
-                  <Text style={styles.gridValue}>
-                    {profile.full_name || "—"}
-                  </Text>
-                )}
-              </View>
-
-              {/* Phone */}
-              <View style={styles.gridRow}>
-                <Text style={styles.gridLabel}>Phone Number</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={styles.gridInput}
-                    value={profile.phone_number}
-                    onChangeText={(t) =>
-                      setProfile({ ...profile, phone_number: t })
-                    }
-                    keyboardType="phone-pad"
-                  />
-                ) : (
-                  <Text style={styles.gridValue}>
-                    {profile.phone_number || "—"}
-                  </Text>
-                )}
-              </View>
-
-              {/* Address */}
-              <View style={styles.gridRow}>
-                <Text style={styles.gridLabel}>Delivery Address</Text>
-                {isEditing ? (
-                  <TextInput
-                    style={[styles.gridInput, styles.multilineInput]}
-                    value={profile.address}
-                    onChangeText={(t) => setProfile({ ...profile, address: t })}
-                    multiline
-                  />
-                ) : (
-                  <Text style={[styles.gridValue, styles.multilineValue]}>
-                    {profile.address || "—"}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Actions */}
-            <View style={styles.actionZone}>
-              {isEditing ? (
-                <TouchableOpacity
-                  style={styles.primaryAction}
-                  onPress={updateProfile}
-                  disabled={saving}
-                >
-                  <LinearGradient
-                    colors={[SWISS.gold, SWISS.goldLight]}
-                    style={styles.gradientButton}
-                  >
-                    {saving ? (
-                      <ActivityIndicator color={SWISS.navy} />
-                    ) : (
-                      <Text style={styles.primaryActionText}>SAVE CHANGES</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              ) : (
-                <>
-                  {profile.role === "seller" && (
-                    <TouchableOpacity
-                      style={styles.secondaryAction}
-                      onPress={() => navigation.navigate("CreateListing")}
-                    >
-                      <MaterialCommunityIcons
-                        name="store-plus-outline"
-                        size={22}
-                        color={SWISS.gold}
-                      />
-                      <Text style={styles.secondaryActionText}>
-                        MANAGE LISTINGS
+          {/* IDENTITY CARD */}
+          <View style={styles.identityCard}>
+            <View style={styles.avatarRow}>
+              <TouchableOpacity onPress={pickImage} disabled={uploading}>
+                <View style={styles.avatarContainer}>
+                  {uploading ? (
+                    <ActivityIndicator color={COLORS.primary} />
+                  ) : profile.avatar_url ? (
+                    <Image
+                      source={{ uri: profile.avatar_url }}
+                      style={styles.avatarImage}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarInitial}>
+                        {profile.full_name
+                          ? profile.full_name.charAt(0).toUpperCase()
+                          : "U"}
                       </Text>
-                    </TouchableOpacity>
+                    </View>
                   )}
+                  <View style={styles.cameraBadge}>
+                    <MaterialCommunityIcons
+                      name="camera"
+                      size={14}
+                      color="white"
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.identityText}>
+                <Text style={styles.fullName}>
+                  {profile.full_name || "Guest User"}
+                </Text>
+                <Text style={styles.emailText}>{user?.email}</Text>
+                <View
+                  style={[
+                    styles.roleTag,
+                    profile.role === "seller"
+                      ? styles.roleSeller
+                      : styles.roleBuyer,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roleText,
+                      profile.role === "seller"
+                        ? { color: "#B7791F" }
+                        : { color: COLORS.primary },
+                    ]}
+                  >
+                    {profile.role === "seller"
+                      ? "Supplier Account"
+                      : "Buyer Account"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* FORM */}
+          <View style={styles.formContainer}>
+            <Text style={styles.sectionTitle}>CONTACT DETAILS</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Phone Number</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.input}
+                  value={profile.phone_number}
+                  onChangeText={(t) =>
+                    setProfile({ ...profile, phone_number: t })
+                  }
+                  keyboardType="phone-pad"
+                  placeholder="+263..."
+                />
+              ) : (
+                <Text style={styles.value}>
+                  {profile.phone_number || "Not set"}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Delivery Address</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.input}
+                  value={profile.address}
+                  onChangeText={(t) => setProfile({ ...profile, address: t })}
+                  placeholder="Street, Suburb, City"
+                />
+              ) : (
+                <Text style={styles.value}>{profile.address || "Not set"}</Text>
+              )}
+            </View>
+
+            {isEditing && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profile.full_name}
+                  onChangeText={(t) => setProfile({ ...profile, full_name: t })}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* ACTIONS */}
+          <View style={styles.actionSection}>
+            {isEditing ? (
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={updateProfile}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.btnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <>
+                {profile.role === "seller" && (
                   <TouchableOpacity
-                    style={styles.logoutAction}
-                    onPress={handleLogout}
+                    style={styles.secondaryBtn}
+                    onPress={() => navigation.navigate("MyListings")}
                   >
                     <MaterialCommunityIcons
-                      name="logout-variant"
+                      name="store-plus"
                       size={20}
-                      color={SWISS.grey}
+                      color={COLORS.secondary}
                     />
-                    <Text style={styles.logoutText}>Sign Out</Text>
+                    <Text style={styles.secondaryBtnText}>Manage Listings</Text>
                   </TouchableOpacity>
-                </>
-              )}
-            </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.logoutBtn}
+                  onPress={handleLogout}
+                >
+                  <MaterialCommunityIcons
+                    name="logout"
+                    size={20}
+                    color={COLORS.textSub}
+                  />
+                  <Text style={styles.logoutText}>Sign Out</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
-          {/* Bottom Padding */}
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -358,223 +363,199 @@ export default function ProfileScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: SWISS.offWhite },
+  container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: 0 },
 
-  // --- 1. HEADER ---
-  heroHeader: {
-    height: 300, // Tall header
-    paddingHorizontal: 32,
-    justifyContent: "flex-end",
-    paddingBottom: 50,
-  },
-  editButton: {
-    position: "absolute",
-    right: 32,
-    backgroundColor: SWISS.gold,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 20,
-  },
-  editButtonText: {
-    fontSize: 11,
-    color: SWISS.navy,
-    fontFamily: FONTS.bold,
-    letterSpacing: 1.5,
-  },
-  titleContainer: { marginBottom: 10 },
-  heroTitle: {
-    fontSize: 56,
-    color: SWISS.white,
-    fontFamily: FONTS.serif, // Editorial Look
-    letterSpacing: -1,
-  },
-  titleUnderline: {
-    width: 60,
-    height: 4,
-    backgroundColor: SWISS.gold,
-    marginTop: 8,
-  },
-
-  // --- 2. AVATAR BRIDGE (THE FIX) ---
-  avatarBridge: {
+  // GUEST
+  guestHeader: {
+    flex: 1,
     alignItems: "center",
-    marginTop: -90, // Pull UP into the blue header
-    marginBottom: -60, // Pull the white card UP behind the avatar
-    zIndex: 10, // Ensure avatar sits on top
+    justifyContent: "center",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    paddingBottom: 60,
   },
-  avatarWrapper: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: SWISS.white,
-    borderWidth: 4,
-    borderColor: SWISS.white,
+  guestTitle: {
+    fontSize: 24,
+    color: "white",
+    fontFamily: FONTS.bold,
+    marginTop: 20,
+  },
+  guestSub: {
+    fontSize: 16,
+    color: "#E2E8F0",
+    fontFamily: FONTS.regular,
+    marginTop: 10,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
+  guestContent: { flex: 1, padding: 40, justifyContent: "center" },
+
+  // HEADER
+  headerBg: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 25,
+    paddingBottom: 80,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitle: { fontSize: 24, color: "white", fontFamily: FONTS.bold },
+  editBtn: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  editBtnText: { color: "white", fontFamily: FONTS.bold, fontSize: 12 },
+
+  // IDENTITY CARD
+  identityCard: {
+    backgroundColor: "white",
+    marginHorizontal: 20,
+    marginTop: -50,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
-  avatarImage: { width: "100%", height: "100%", borderRadius: 60 },
+  avatarRow: { flexDirection: "row", alignItems: "center" },
+  avatarContainer: { position: "relative", marginRight: 20 },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#E2E8F0",
+  },
   avatarPlaceholder: {
-    backgroundColor: "#E8E8E8",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#E2E8F0",
     justifyContent: "center",
     alignItems: "center",
   },
   avatarInitial: {
-    fontSize: 42,
-    color: "#666",
-    fontFamily: FONTS.serif,
+    fontSize: 32,
+    color: COLORS.textSub,
+    fontFamily: FONTS.bold,
   },
-  avatarLoading: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 60,
-    backgroundColor: "#E8E8E8",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cameraIcon: {
+  cameraBadge: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: SWISS.gold,
+    backgroundColor: COLORS.secondary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
-    borderColor: SWISS.white,
+    borderWidth: 2,
+    borderColor: "white",
   },
 
-  // --- 3. CONTENT CARD (THE FIX) ---
-  contentCard: {
-    backgroundColor: SWISS.white,
-    marginHorizontal: 20,
-    borderRadius: 24,
-    paddingTop: 70, // Push text DOWN so it doesn't touch the avatar
-    paddingHorizontal: 24,
-    paddingBottom: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-
-  identitySection: { alignItems: "center", marginBottom: 8 },
-  displayName: {
-    fontSize: 24,
-    color: SWISS.navy,
+  identityText: { flex: 1 },
+  fullName: {
+    fontSize: 20,
+    color: COLORS.textMain,
     fontFamily: FONTS.bold,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  emailAddress: {
+  emailText: {
     fontSize: 14,
-    color: SWISS.grey,
+    color: COLORS.textSub,
     fontFamily: FONTS.regular,
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  roleBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: SWISS.offWhite,
+
+  roleTag: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 8,
   },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: SWISS.gold,
-    marginRight: 6,
-  },
+  roleBuyer: { backgroundColor: "#EBF8FF" },
+  roleSeller: { backgroundColor: "#FFFFF0" },
   roleText: {
-    fontSize: 10,
-    color: SWISS.navy,
+    fontSize: 11,
     fontFamily: FONTS.bold,
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
 
-  spacer: { height: 32 },
-
-  infoGrid: { marginBottom: 32 },
-  gridHeader: {
-    fontSize: 11,
-    color: SWISS.grey,
+  // FORM
+  formContainer: { padding: 25 },
+  sectionTitle: {
+    fontSize: 12,
+    color: COLORS.textMuted,
     fontFamily: FONTS.bold,
     letterSpacing: 1,
     marginBottom: 20,
   },
-  gridRow: { marginBottom: 20 },
-  gridLabel: {
-    fontSize: 11,
-    color: SWISS.grey,
+  inputGroup: { marginBottom: 20 },
+  label: {
+    fontSize: 12,
+    color: COLORS.textSub,
+    marginBottom: 5,
     fontFamily: FONTS.bold,
-    marginBottom: 6,
-    textTransform: "uppercase",
   },
-  gridValue: {
+  value: { fontSize: 16, color: COLORS.textMain, fontFamily: FONTS.regular },
+  input: {
     fontSize: 16,
-    color: SWISS.navy,
-    fontFamily: FONTS.regular,
-  },
-  multilineValue: { lineHeight: 24 },
-  gridInput: {
-    fontSize: 16,
-    color: SWISS.navy,
+    color: COLORS.textMain,
     fontFamily: FONTS.regular,
     borderBottomWidth: 1,
-    borderBottomColor: SWISS.gold,
-    paddingVertical: 6,
+    borderBottomColor: COLORS.border,
+    paddingVertical: 8,
   },
-  multilineInput: { minHeight: 60, textAlignVertical: "top" },
 
-  actionZone: { gap: 12 },
-  primaryAction: { borderRadius: 12, overflow: "hidden" },
-  gradientButton: {
+  // ACTIONS
+  actionSection: { paddingHorizontal: 25, gap: 15 },
+  primaryBtn: {
+    backgroundColor: COLORS.secondary,
     paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
-    justifyContent: "center",
   },
-  primaryActionText: {
-    fontSize: 13,
-    color: SWISS.navy,
-    fontFamily: FONTS.bold,
-    letterSpacing: 1,
+  primaryAction: {
+    backgroundColor: COLORS.secondary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    width: "100%",
   },
-  secondaryAction: {
+  primaryActionText: { color: "white", fontFamily: FONTS.bold, fontSize: 14 },
+  btnText: { color: "white", fontFamily: FONTS.bold, fontSize: 16 },
+
+  secondaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    backgroundColor: SWISS.white,
-    borderWidth: 1.5,
-    borderColor: SWISS.gold,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: COLORS.secondary,
     paddingVertical: 14,
     borderRadius: 12,
   },
-  secondaryActionText: {
-    fontSize: 13,
-    color: SWISS.gold,
+  secondaryBtnText: {
+    color: COLORS.secondary,
     fontFamily: FONTS.bold,
-    letterSpacing: 1,
+    fontSize: 14,
   },
-  logoutAction: {
+
+  logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 15,
   },
-  logoutText: {
-    fontSize: 13,
-    color: SWISS.grey,
-    fontFamily: FONTS.bold,
-  },
+  logoutText: { color: COLORS.textSub, fontFamily: FONTS.bold, fontSize: 14 },
 });

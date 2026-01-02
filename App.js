@@ -8,6 +8,7 @@ import { COLORS } from "./src/theme/colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
+import MyListingsScreen from "./src/screens/MyListingsScreen";
 
 // FONTS
 import {
@@ -74,7 +75,10 @@ function NavigationWrapper() {
 
         {/* Logged In Only */}
         {user && (
+          <>
           <Stack.Screen name="CreateListing" component={CreateListingScreen} />
+          <Stack.Screen name="MyListings" component={MyListingsScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

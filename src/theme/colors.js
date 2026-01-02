@@ -1,23 +1,32 @@
 export const COLORS = {
-  // Backgrounds
-  background: "#F9F7F2", // "Parchment" - softer than harsh white
-  surface: "#FFFFFF", // Pure white for cards
+  // --- VICTORIA FALLS PALETTE ---
+  background: "#F5F7FA", // Mist
+  surface: "#FFFFFF", // White
 
-  // Text
-  textMain: "#1A2138", // "Midnight Ink" - softer than pure black
-  textSub: "#5A6375", // "Stone Gray"
-  textMuted: "#949AB0", // "Mist"
+  // PRIMARY: River Blue (Safe Fallbacks included)
+  primary: "#2C5282",
+  primaryLight: "#4299E1",
+  primaryDark: "#1A365D", // Added for extra depth
 
-  // Accents (The "Royalty")
-  accent: "#1B3C73", // "Deep Royal Blue" (Primary Brand)
-  accentDark: "#0F264D", // Darker shade for gradients
-  gold: "#D4AF37", // "Metallic Gold" - for premium highlights
+  // ACCENT: Savannah Green
+  secondary: "#2F855A",
+  secondaryLight: "#48BB78",
 
-  // Functional
-  success: "#2E7D32", // "Forest Green"
-  error: "#C62828", // "Crimson"
+  // HIGHLIGHT: Sun Yellow
+  highlight: "#D69E2E",
 
-  // UI Elements
-  border: "#E8E6DF", // Subtle border matching parchment
-  shadow: "#1A2138", // For deep, rich shadows
+  // TEXT
+  textMain: "#1A202C",
+  textSub: "#718096",
+  textMuted: "#A0AEC0",
+
+  // FUNCTIONAL
+  success: "#38A169",
+  error: "#E53E3E",
+  border: "#E2E8F0",
+
+  // --- COMPATIBILITY MAPPING (Prevents Old Code Crashes) ---
+  accent: "#2C5282", // Maps to Primary
+  accentDark: "#1A365D", // Maps to PrimaryDark
+  gold: "#D69E2E", // Maps to Highlight
 };
